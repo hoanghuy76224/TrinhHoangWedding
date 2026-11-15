@@ -448,17 +448,16 @@ img{display:block;max-width:100%}
 <div class="adm" id="adm">
   <div class="lock" id="admLock">
     <h1>Quản lý khách mời</h1>
-    <p style="font-size:13px;color:var(--soft)">Nhập mã PIN của cô dâu chú rể</p>
-    <input id="pinIn" type="password" inputmode="numeric" maxlength="8" autocomplete="off">
+    <p style="font-size:13px;color:var(--soft)">Nhập mật khẩu để quản lý thiệp</p>
+    <input id="pinIn" type="password" maxlength="80" autocomplete="off" aria-label="Mật khẩu admin">
     <button class="b" id="pinBtn" type="button" style="width:100%">Vào trang quản lý</button>
     <p id="pinErr" style="font-size:12.5px;color:#a33;margin-top:8px;min-height:18px"></p>
   </div>
   <div class="adm-in" id="admIn" hidden>
     <div class="adm-hd">
       <div><h1>Khách mời · Hoàng &amp; Trinh</h1><small id="admMode"></small></div>
-      <button class="x" id="admClose" type="button">Xem thiệp</button>
+      <div class="row"><button class="x" id="admClose" type="button">Xem thiệp</button><button class="x" id="adminLogout" type="button">Thoát admin</button></div>
     </div>
-    <div class="box"><p id="adminAuthState" role="status">Đăng nhập Google để đồng bộ khách mời và quản lý lời chúc.</p><button class="b" id="adminGoogle" type="button" style="margin-top:10px">Đăng nhập Google quản trị</button><button class="b gh" id="adminLogout" type="button" hidden style="margin-top:10px">Đăng xuất</button></div>
     <div class="box"><h2>Chọn thiệp để tạo link mời</h2><label for="adminSide">Nhà tổ chức</label><select id="adminSide"><option value="bride">Nhà gái · 28/11/2026</option><option value="groom">Nhà trai · 27/12/2026</option></select></div>
     <div class="box">
       <h2>Tạo link mời theo tên khách</h2>
@@ -493,7 +492,8 @@ img{display:block;max-width:100%}
   'use strict';
   var WEDDING = new Date('2026-12-27T11:00:00+07:00');
   var SITE = 'https://trinhhoangwedding.khunglongcon.com/nhatrai/';
-  var PIN = '2811';
+  var ADMIN_UID = '5ERxT5mA2EQXkhHzXPIs2x8va8f2';
+  var ADMIN_EMAIL = 'trinhhoang-admin@vo-iu-dino-848d2.firebaseapp.com';
   var FIREBASE_CONFIG = {apiKey:"AIzaSyDKojhw5-SFWukGSN_oSjw5vxJngrfIogo",authDomain:"vo-iu-dino-848d2.firebaseapp.com",projectId:"vo-iu-dino-848d2",storageBucket:"vo-iu-dino-848d2.firebasestorage.app",messagingSenderId:"879023470388",appId:"1:879023470388:web:ecc9128f6f280b26249761"};
   var COL_G = 'guests_trinhhoang_nhatrai';
   var $ = function(s){ return document.querySelector(s); };
@@ -505,7 +505,7 @@ img{display:block;max-width:100%}
   function lsGet(k){ try { return JSON.parse(localStorage.getItem(LS + k) || '[]'); } catch(e){ return []; } }
   function lsSet(k, v){ try { localStorage.setItem(LS + k, JSON.stringify(v)); } catch(e){} }
   ready = Promise.all([import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js'), import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js'), import('https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js')])
-    .then(function(m){ var app = m[0].initializeApp(FIREBASE_CONFIG); api = m[1]; db = api.getFirestore(app); authApi=m[2]; auth=authApi.getAuth(app); authApi.onAuthStateChanged(auth,function(user){ updateAdminAuth(user); }); return true; })
+    .then(async function(m){ var app = m[0].initializeApp(FIREBASE_CONFIG); api = m[1]; db = api.getFirestore(app); authApi=m[2]; auth=authApi.getAuth(app); await authApi.setPersistence(auth,authApi.browserSessionPersistence); authApi.onAuthStateChanged(auth,function(user){ updateAdminAuth(user); }); return true; })
     .catch(function(){ return false; });
   var listeners = {};
   function watch(col, cb){
@@ -513,7 +513,7 @@ img{display:block;max-width:100%}
     ready.then(function(ok){
       if (ok && db){
         api.onSnapshot(api.collection(db, col), function(s){ cb(s.docs.map(function(d){ var x = d.data(); x.id = d.id; if (x.createdAt && x.createdAt.toMillis) x.ts = x.createdAt.toMillis(); return x; })); },
-          function(){ var m = document.getElementById('admMode'); if (m) m.textContent = 'Chưa có quyền đồng bộ. Vui lòng đăng nhập quản trị.'; });
+          function(){ var m = document.getElementById('admMode'); if (m) m.textContent = 'Phiên quản lý đã hết hạn. Vui lòng vào lại admin.'; });
       } else cb(lsGet(col));
     });
   }
@@ -641,14 +641,13 @@ img{display:block;max-width:100%}
     var csv='\uFEFF'+rows.map(function(row){return row.map(function(v){v=String(v == null ? '' : v);if (/^[=+@-]/.test(v)) v="'"+v;return '"'+v.replace(/"/g,'""')+'"';}).join(',');}).join('\n');
     var a=document.createElement('a'), url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.href=url;a.download='loi-chuc-trinh-hoang.csv';a.click();setTimeout(function(){URL.revokeObjectURL(url);},1000);
   });
-  function isSiteAdmin(){return !!(auth && auth.currentUser && ['hoang615@gmail.com','ntd031096@gmail.com'].indexOf(auth.currentUser.email)>=0);}
-  function updateAdminAuth(user){
-    if (!$('#adminAuthState')) return;
-    var ok=isSiteAdmin();$('#adminAuthState').textContent=ok ? 'Đã đăng nhập: '+user.email : (user ? 'Tài khoản này chưa có quyền quản trị thiệp.' : 'Đăng nhập Google để đồng bộ khách mời và quản lý lời chúc.');
-    $('#adminGoogle').hidden=ok;$('#adminLogout').hidden=!user;
-    if (ok && typeof started!=='undefined' && started){selectAdminSide();$('#admMode').textContent='Đang đồng bộ online · cập nhật trực tiếp';}
+  function isSiteAdmin(){return !!(auth && auth.currentUser && auth.currentUser.uid===ADMIN_UID);}
+  function updateAdminAuth(){
+    if (isSiteAdmin() && isAdminHash()){
+      if ($('#admIn').hidden) unlock();
+      else if (started){selectAdminSide();$('#admMode').textContent='Đang đồng bộ online · cập nhật trực tiếp';}
+    }
   }
-  $('#adminGoogle').addEventListener('click',function(){ready.then(function(ok){if(!ok || !auth)throw new Error('offline');return authApi.signInWithPopup(auth,new authApi.GoogleAuthProvider());}).catch(function(e){$('#adminAuthState').textContent=e.code==='auth/unauthorized-domain' ? 'Tên miền thiệp chưa được cấp quyền đăng nhập Firebase.' : 'Chưa đăng nhập được. Vui lòng thử lại.';});});
   $('#adminLogout').addEventListener('click',function(){if(auth)authApi.signOut(auth).then(function(){location.reload();});});
   var adminWatched = {};
   function selectAdminSide(){
@@ -679,21 +678,33 @@ img{display:block;max-width:100%}
   function isAdminHash(){ return /^#(quanly|admin)$/i.test(location.hash); }
   function showAdm(){
     adm.classList.add('show'); document.body.style.overflow = 'hidden';
-    var ok = false; try { ok = sessionStorage.getItem('th_pin') === '1'; } catch(e){}
-    if (ok) unlock(); else setTimeout(function(){ $('#pinIn').focus(); }, 50);
+    if (isSiteAdmin()) unlock(); else setTimeout(function(){ $('#pinIn').focus(); }, 50);
   }
   function hideAdm(){ adm.classList.remove('show'); document.body.style.overflow = ''; if (isAdminHash()) history.replaceState(null, '', location.pathname + location.search); }
-  $('#pinBtn').addEventListener('click', function(){ if ($('#pinIn').value === PIN){ try { sessionStorage.setItem('th_pin', '1'); } catch(e){} unlock(); } else $('#pinErr').textContent = 'Mã PIN chưa đúng'; });
+  $('#pinBtn').addEventListener('click', function(){
+    var password=$('#pinIn').value.trim(), button=$('#pinBtn'), error=$('#pinErr');
+    if (!password || button.disabled) return;
+    button.disabled=true;error.textContent='Đang kiểm tra mật khẩu…';
+    ready.then(function(ok){
+      if(!ok || !auth)throw new Error('offline');
+      return authApi.signInWithEmailAndPassword(auth,ADMIN_EMAIL,'trinhhoang-admin:'+password);
+    }).then(function(){
+      if(!isSiteAdmin())throw new Error('unauthorized');
+      $('#pinIn').value='';error.textContent='';unlock();
+    }).catch(function(e){
+      error.textContent=e.message==='offline' || e.code==='auth/network-request-failed' ? 'Chưa kết nối được. Bạn thử lại nhé.' : e.code==='auth/too-many-requests' ? 'Bạn thử nhiều lần quá nhanh. Vui lòng đợi một lát.' : 'Mật khẩu chưa đúng';
+    }).finally(function(){button.disabled=false;});
+  });
   $('#pinIn').addEventListener('keydown', function(e){ if (e.key === 'Enter') $('#pinBtn').click(); });
   $('#admClose').addEventListener('click', hideAdm);
   window.addEventListener('hashchange', function(){ if (isAdminHash()) showAdm(); });
   if (isAdminHash()){ $('#intro').style.display = 'none'; document.body.classList.remove('locked'); startReveal(); showAdm(); }
 
   function unlock(){
+    if (!isSiteAdmin()) return;
     $('#admLock').hidden = true; $('#admIn').hidden = false;
     if (started) return; started = true;
-    updateAdminAuth(auth && auth.currentUser);
-    ready.then(function(ok){ $('#admMode').textContent = ok && db ? (isSiteAdmin() ? 'Đang đồng bộ online · cập nhật trực tiếp' : 'Tạo link nhanh được ngay · đăng nhập để lưu danh sách') : 'Chưa kết nối được máy chủ'; });
+    ready.then(function(ok){ $('#admMode').textContent = ok && db ? 'Đang đồng bộ online · cập nhật trực tiếp' : 'Chưa kết nối được máy chủ'; });
     selectAdminSide();
   }
   function link(g){ return SITE + '?g=' + g.id + '&n=' + encodeURIComponent(g.name); }
