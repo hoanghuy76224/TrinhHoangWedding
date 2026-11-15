@@ -289,6 +289,12 @@ img{display:block;max-width:100%}
 .op-date{font-family:var(--disp);font-size:26px;letter-spacing:.12em;margin:0 0 12px}
 .wi-ceremony{font-size:13px;line-height:1.7;color:var(--soft);max-width:310px;margin:18px auto 0}
 .wp-hall{font-family:var(--disp);font-weight:600;font-size:18px;letter-spacing:.03em;margin-top:10px;color:var(--deep)}
+
+.guestbook-hint{font-size:14px;text-align:center;color:var(--soft);margin:0 0 20px;line-height:1.7}
+.wish-field{display:none!important}
+.wish-list p{white-space:pre-wrap;overflow-wrap:anywhere}
+.admin-link{margin-top:12px;padding:12px;background:var(--paper);border-radius:10px;overflow-wrap:anywhere}
+.admin-link a{display:block;font-size:13px;line-height:1.7;margin-bottom:10px}
 </style>
 </head>
 <body class="locked">
@@ -455,9 +461,10 @@ img{display:block;max-width:100%}
       <div><h1>Khách mời · Hoàng &amp; Trinh</h1><small id="admMode"></small></div>
       <button class="x" id="admClose" type="button">Xem thiệp</button>
     </div>
+    <div class="box"><h2>Chọn thiệp để tạo link mời</h2><label for="adminSide">Nhà tổ chức</label><select id="adminSide"><option value="bride">Nhà gái · 28/11/2026</option><option value="groom">Nhà trai · 27/12/2026</option></select></div>
     <div class="stats" id="stats"></div>
     <div class="box">
-      <h2>Thêm khách mời</h2>
+      <h2>Tạo link mời theo tên khách</h2>
       <div class="row" style="margin-bottom:8px">
         <input id="gName" placeholder="Tên trên thiệp (VD: Anh Hùng &amp; gia đình)">
         <select id="gGroup"><option>Nhà gái</option><option>Nhà trai</option><option>Bạn cô dâu</option><option>Bạn chú rể</option><option>Đồng nghiệp</option><option>Hàng xóm</option></select>
@@ -467,6 +474,8 @@ img{display:block;max-width:100%}
         <select id="gNum"><option value="1">Dự kiến 1 người</option><option value="2" selected>Dự kiến 2 người</option><option value="3">Dự kiến 3 người</option><option value="4">Dự kiến 4 người</option><option value="5">Dự kiến 5+ người</option></select>
         <button class="b" id="gAdd" type="button">+ Thêm</button>
       </div>
+      <div class="row" style="margin-top:10px"><button class="b gh" id="gQuick" type="button">Tạo link theo tên</button></div>
+      <div id="createdLink" class="admin-link" hidden><a id="createdLinkUrl" target="_blank" rel="noopener"></a><button id="copyCreated" class="b gh" type="button">Sao chép link</button><button id="openCreated" class="b gh" type="button" style="margin-left:8px">Xem thiệp</button></div>
       <details style="margin-top:10px"><summary style="font-size:13px;cursor:pointer;color:var(--red)">Thêm nhanh nhiều khách (mỗi dòng 1 tên)</summary>
         <textarea id="gBulk" rows="5" style="margin-top:8px" placeholder="Cô Hạnh &amp; gia đình&#10;Anh Nam&#10;Bạn Thảo"></textarea>
         <button class="b" id="gBulkAdd" type="button" style="margin-top:8px">Thêm tất cả vào nhóm đang chọn</button>
@@ -478,6 +487,7 @@ img{display:block;max-width:100%}
       <div class="tabs" id="tabs"></div>
       <div class="gl" id="gl"></div>
     </div>
+    <div class="box" id="adminWishes"><h2>Lời chúc nhà gái <span id="wishCount"></span></h2><button class="b gh" id="wishCsv" type="button" style="margin-bottom:12px">Xuất lời chúc (CSV)</button><div class="gl wish-list" id="wishAdminList"></div></div>
     <div class="box">
       <h2>Phản hồi từ link chung (khách không có trong danh sách)</h2>
       <div class="gl" id="gExtra"></div>
@@ -551,9 +561,10 @@ img{display:block;max-width:100%}
   /* ---------- khách cá nhân hoá: ?g=id&n=Tên ---------- */
   var P = new URLSearchParams(location.search);
   var GID = (P.get('g') || '').replace(/[^a-z0-9]/gi, '').slice(0, 12);
-  var GUEST = {name: (P.get('n') || P.get('to') || '').trim().slice(0, 80), group: ''};
+  var GUEST = {name: (P.get('n') || P.get('to') || P.get('khach') || '').trim().slice(0, 80), group: ''};
   function applyGuest(){
     if (!GUEST.name) return;
+    if ($('#wishName') && !$('#wishName').value) $('#wishName').value = GUEST.name;
     $('#iGuest').innerHTML = 'Kính gửi<b>' + esc(GUEST.name) + '</b>';
     $('#invGuest').textContent = GUEST.name;
   }
@@ -601,6 +612,64 @@ img{display:block;max-width:100%}
   bk();
   lb.addEventListener('click', function(){ lb.classList.remove('on'); });
 
+
+  /* ---------- sổ lưu bút nhà gái ---------- */
+  var COL_W = 'wishes_trinhhoang', wishes = [], wishShown = 6;
+  function wishSort(l){ return l.slice().sort(function(a,b){ return (b.ts || 0) - (a.ts || 0); }); }
+  function drawWishes(){
+    var visible = wishes.slice(0, wishShown), wall = $('#wishWall');
+    if (wall){
+      wall.innerHTML = visible.length ? visible.map(function(w){ return '<div class="wn"><p>' + esc(w.wish) + '</p><b>— ' + esc(w.name || 'Khách mời') + '</b></div>'; }).join('') : '<div class="wn-empty">Hãy là người đầu tiên gửi lời chúc cho chúng mình nhé!</div>';
+      $('#wishMore').hidden = wishes.length <= wishShown;
+    }
+    $('#wishCount').textContent = '(' + wishes.length + ')';
+    $('#wishAdminList').innerHTML = wishes.length ? wishes.map(function(w){ return '<div class="gi"><div class="nm">' + esc(w.name) + '</div><div class="mt"><p>' + esc(w.wish) + '</p></div><div class="ac"><button type="button" data-wish-delete="' + esc(w.id) + '">Xoá</button></div></div>'; }).join('') : '<div class="wn-empty">Chưa có lời chúc nào.</div>';
+  }
+  var wishesStarted = false;
+  function startWishes(){ if (wishesStarted) return; wishesStarted = true; watch(COL_W, function(l){ wishes = wishSort(l); drawWishes(); }); }
+  if ($('#wishForm')){
+    startWishes();
+    $('#wishMore').addEventListener('click', function(){ wishShown += 6; drawWishes(); });
+    $('#wishForm').addEventListener('submit', function(e){
+      e.preventDefault(); var name = $('#wishName').value.trim().slice(0,80), wish = $('#wishText').value.trim().slice(0,600), msg = $('#wishMessage'), send = $('#wishSend');
+      if (!name || !wish || $('#wishWeb').value || send.disabled) return;
+      send.disabled = true; msg.textContent = 'Đang gửi lời chúc…';
+      ready.then(function(ok){
+        if (!ok || !db) throw new Error('offline');
+        return put(COL_W, 'w' + Date.now().toString(36) + rid(), {name:name, wish:wish, invitedAs:GUEST.name || '', ts:Date.now()});
+      }).then(function(){ $('#wishText').value = ''; msg.textContent = 'Cảm ơn bạn, chúng mình đã nhận được lời chúc ♡'; })
+        .catch(function(){ msg.textContent = 'Chưa gửi được lời chúc. Bạn vui lòng thử lại nhé.'; })
+        .finally(function(){ send.disabled = false; });
+    });
+  }
+  $('#wishAdminList').addEventListener('click', function(e){ var b=e.target.closest('[data-wish-delete]'); if (!b || !confirm('Xoá lời chúc này?')) return; del(COL_W,b.dataset.wishDelete).catch(function(){ toast('Chưa xoá được lời chúc, vui lòng thử lại'); }); });
+  $('#wishCsv').addEventListener('click', function(){
+    var rows=[['Tên','Lời chúc','Tên trên thiệp','Thời gian']].concat(wishes.map(function(w){return [w.name,w.wish,w.invitedAs || '',w.ts ? new Date(w.ts).toLocaleString('vi-VN') : ''];}));
+    var csv='\uFEFF'+rows.map(function(row){return row.map(function(v){v=String(v == null ? '' : v);if (/^[=+@-]/.test(v)) v="'"+v;return '"'+v.replace(/"/g,'""')+'"';}).join(',');}).join('\n');
+    var a=document.createElement('a'), url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.href=url;a.download='loi-chuc-trinh-hoang.csv';a.click();setTimeout(function(){URL.revokeObjectURL(url);},1000);
+  });
+  var adminWatched = {};
+  function selectAdminSide(){
+    var groom=$('#adminSide').value==='groom';
+    SITE='https://trinhhoangwedding.khunglongcon.com/'+(groom ? 'nhatrai/' : '');
+    COL_G='guests_trinhhoang'+(groom ? '_nhatrai' : ''); COL_R='rsvp_trinhhoang'+(groom ? '_nhatrai' : '');
+    G=[];R=[];filter='Tất cả';$('#q').value='';$('#createdLink').hidden=true;
+    $('#gGroup').value=groom ? 'Nhà trai' : 'Nhà gái';$('#adminWishes').hidden=groom;
+    draw();
+    [COL_G,COL_R].forEach(function(col){
+      if (adminWatched[col]){ if (col===COL_G) G=adminWatched[col]; else R=adminWatched[col]; draw(); return; }
+      adminWatched[col]=[];
+      watch(col,function(l){adminWatched[col]=l;if(col===COL_G){G=l;draw();}else if(col===COL_R){R=l;draw();}});
+    });
+    if (!groom) startWishes();
+  }
+  $('#adminSide').value=location.pathname.indexOf('/nhatrai')===0 ? 'groom' : 'bride';
+  $('#adminSide').addEventListener('change',selectAdminSide);
+  function showCreated(url){ $('#createdLinkUrl').href=url;$('#createdLinkUrl').textContent=url;$('#createdLink').hidden=false; }
+  $('#gQuick').addEventListener('click',function(){ var name=$('#gName').value.trim().slice(0,80);if(!name)return $('#gName').focus();showCreated(SITE+'?n='+encodeURIComponent(name)); });
+  $('#copyCreated').addEventListener('click',function(){copy($('#createdLinkUrl').href).then(function(){toast('Đã sao chép link mời');});});
+  $('#openCreated').addEventListener('click',function(){window.open($('#createdLinkUrl').href,'_blank','noopener');});
+
   /* ================= ADMIN ================= */
   var adm = $('#adm'), G = [], R = [], filter = 'Tất cả', started = false;
   function isAdminHash(){ return /^#(quanly|admin)$/i.test(location.hash); }
@@ -620,16 +689,16 @@ img{display:block;max-width:100%}
     $('#admLock').hidden = true; $('#admIn').hidden = false;
     if (started) return; started = true;
     ready.then(function(ok){ $('#admMode').textContent = ok && db ? 'Đang đồng bộ online · cập nhật trực tiếp' : 'Chế độ demo · dữ liệu lưu trên máy này'; });
-    watch(COL_G, function(l){ G = l; draw(); });
-    watch(COL_R, function(l){ R = l; draw(); });
+    selectAdminSide();
   }
   function link(g){ return SITE + '?g=' + g.id + '&n=' + encodeURIComponent(g.name); }
   function addGuest(name){
     name = name.trim(); if (!name) return Promise.resolve();
     var id = rid();
-    return put(COL_G, id, {name: name.slice(0, 80), group: $('#gGroup').value, phone: $('#gPhone').value.trim().slice(0, 20), num: +$('#gNum').value, status: 'pending'});
+    var url=link({id:id,name:name.slice(0,80)});
+    return put(COL_G, id, {name: name.slice(0, 80), group: $('#gGroup').value, phone: $('#gPhone').value.trim().slice(0, 20), num: +$('#gNum').value, status: 'pending'}).then(function(){showCreated(url);});
   }
-  $('#gAdd').addEventListener('click', function(){ var n = $('#gName').value; if (!n.trim()) return $('#gName').focus(); addGuest(n).then(function(){ $('#gName').value = ''; $('#gPhone').value = ''; toast('Đã thêm ' + n.trim()); }); });
+  $('#gAdd').addEventListener('click', function(){ var n = $('#gName').value; if (!n.trim()) return $('#gName').focus(); addGuest(n).then(function(){ $('#gName').value = ''; $('#gPhone').value = ''; toast('Đã thêm ' + n.trim()); }).catch(function(){toast('Chưa lưu được khách mời, vui lòng thử lại');}); });
   $('#gName').addEventListener('keydown', function(e){ if (e.key === 'Enter') $('#gAdd').click(); });
   $('#gBulkAdd').addEventListener('click', function(){ var lines = $('#gBulk').value.split('\n').filter(function(s){ return s.trim(); }); Promise.all(lines.map(addGuest)).then(function(){ $('#gBulk').value = ''; toast('Đã thêm ' + lines.length + ' khách'); }); });
   $('#q').addEventListener('input', draw);
