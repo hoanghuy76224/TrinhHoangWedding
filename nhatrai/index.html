@@ -259,9 +259,6 @@ img{display:block;max-width:100%}
 .adm input,.adm select,.adm textarea{border:1.2px solid #cfdce6;border-radius:10px;padding:9px 11px;font-size:14px;background:#fbfdfe;width:100%}
 .adm .b{border:0;background:var(--red);color:#fff;border-radius:10px;padding:9px 14px;font-size:13.5px;font-weight:600;cursor:pointer;flex:none}
 .adm .b.gh{background:#fff;color:var(--red);border:1.2px solid var(--red)}
-.tabs{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
-.tabs button{border:1px solid #cfdce6;background:#fff;border-radius:999px;padding:6px 12px;font-size:12.5px;cursor:pointer}
-.tabs button.on{background:var(--red);color:#fff;border-color:var(--red)}
 .gl{display:flex;flex-direction:column;gap:8px}
 .gi{display:grid;grid-template-columns:1fr auto;gap:6px 10px;align-items:center;background:#f8fbfd;border:1px solid #dde7ef;border-radius:12px;padding:10px 12px}
 .gi .nm{font-weight:600;font-size:14.5px}
@@ -463,23 +460,19 @@ img{display:block;max-width:100%}
       <h2>Tạo link mời theo tên khách</h2>
       <div class="row" style="margin-bottom:8px">
         <input id="gName" placeholder="Tên trên thiệp (VD: Anh Hùng &amp; gia đình)">
-        <select id="gGroup"><option>Nhà gái</option><option>Nhà trai</option><option>Bạn cô dâu</option><option>Bạn chú rể</option><option>Đồng nghiệp</option><option>Hàng xóm</option></select>
       </div>
       <div class="row">
-        <input id="gPhone" placeholder="SĐT / Zalo (không bắt buộc)">
-        <button class="b" id="gAdd" type="button">+ Thêm</button>
+        <button class="b" id="gAdd" type="button">Tạo link</button>
       </div>
-      <div class="row" style="margin-top:10px"><button class="b gh" id="gQuick" type="button">Tạo link theo tên</button></div>
       <div id="createdLink" class="admin-link" hidden><a id="createdLinkUrl" target="_blank" rel="noopener"></a><button id="copyCreated" class="b gh" type="button">Sao chép link</button><button id="openCreated" class="b gh" type="button" style="margin-left:8px">Xem thiệp</button></div>
       <details style="margin-top:10px"><summary style="font-size:13px;cursor:pointer;color:var(--red)">Thêm nhanh nhiều khách (mỗi dòng 1 tên)</summary>
         <textarea id="gBulk" rows="5" style="margin-top:8px" placeholder="Cô Hạnh &amp; gia đình&#10;Anh Nam&#10;Bạn Thảo"></textarea>
-        <button class="b" id="gBulkAdd" type="button" style="margin-top:8px">Thêm tất cả vào nhóm đang chọn</button>
+        <button class="b" id="gBulkAdd" type="button" style="margin-top:8px">Tạo link cho tất cả</button>
       </details>
     </div>
     <div class="box">
       <h2>Danh sách</h2>
-      <div class="row" style="margin-bottom:10px"><input id="q" placeholder="Tìm tên, SĐT..."><button class="b gh" id="csv" type="button">Xuất Excel (CSV)</button></div>
-      <div class="tabs" id="tabs"></div>
+      <div class="row" style="margin-bottom:10px"><input id="q" placeholder="Tìm tên khách..."><button class="b gh" id="csv" type="button">Xuất Excel (CSV)</button></div>
       <div class="gl" id="gl"></div>
     </div>
     <div class="box" id="adminWishes"><h2>Lời chúc nhà gái <span id="wishCount"></span></h2><button class="b gh" id="wishCsv" type="button" style="margin-bottom:12px">Xuất lời chúc (CSV)</button><div class="gl wish-list" id="wishAdminList"></div></div>
@@ -562,7 +555,7 @@ img{display:block;max-width:100%}
     $('#invGuest').textContent = GUEST.name;
   }
   applyGuest();
-  if (GID) getOne(COL_G, GID).then(function(g){ if (g){ GUEST.name = g.name || GUEST.name; GUEST.group = g.group || ''; applyGuest(); } patch(COL_G, GID, {opened: true}).catch(function(){}); });
+  if (GID) getOne(COL_G, GID).then(function(g){ if (g){ GUEST.name = g.name || GUEST.name; applyGuest(); } patch(COL_G, GID, {opened: true}).catch(function(){}); });
 
   /* ---------- opening ---------- */
   var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -654,8 +647,8 @@ img{display:block;max-width:100%}
     var groom=$('#adminSide').value==='groom';
     SITE='https://trinhhoangwedding.khunglongcon.com/'+(groom ? 'nhatrai/' : '');
     COL_G='guests_trinhhoang'+(groom ? '_nhatrai' : '');
-    G=[];filter='Tất cả';$('#q').value='';$('#createdLink').hidden=true;
-    $('#gGroup').value=groom ? 'Nhà trai' : 'Nhà gái';$('#adminWishes').hidden=groom;
+    G=[];$('#q').value='';$('#createdLink').hidden=true;
+    $('#adminWishes').hidden=groom;
     draw();
     if (!isSiteAdmin()) return;
     var col=COL_G;
@@ -669,12 +662,11 @@ img{display:block;max-width:100%}
   $('#adminSide').value=location.pathname.indexOf('/nhatrai')===0 ? 'groom' : 'bride';
   $('#adminSide').addEventListener('change',selectAdminSide);
   function showCreated(url){ $('#createdLinkUrl').href=url;$('#createdLinkUrl').textContent=url;$('#createdLink').hidden=false; }
-  $('#gQuick').addEventListener('click',function(){ var name=$('#gName').value.trim().slice(0,80);if(!name)return $('#gName').focus();showCreated(SITE+'?n='+encodeURIComponent(name)); });
   $('#copyCreated').addEventListener('click',function(){copy($('#createdLinkUrl').href).then(function(){toast('Đã sao chép link mời');});});
   $('#openCreated').addEventListener('click',function(){window.open($('#createdLinkUrl').href,'_blank','noopener');});
 
   /* ================= ADMIN ================= */
-  var adm = $('#adm'), G = [], filter = 'Tất cả', started = false;
+  var adm = $('#adm'), G = [], started = false;
   function isAdminHash(){ return /^#(quanly|admin)$/i.test(location.hash); }
   function showAdm(){
     adm.classList.add('show'); document.body.style.overflow = 'hidden';
@@ -712,28 +704,23 @@ img{display:block;max-width:100%}
     name = name.trim(); if (!name) return Promise.resolve();
     var id = rid();
     var url=link({id:id,name:name.slice(0,80)});
-    return put(COL_G, id, {name: name.slice(0, 80), group: $('#gGroup').value, phone: $('#gPhone').value.trim().slice(0, 20)}).then(function(){showCreated(url);});
+    return put(COL_G, id, {name: name.slice(0, 80)}).then(function(){showCreated(url);});
   }
-  $('#gAdd').addEventListener('click', function(){ var n = $('#gName').value; if (!n.trim()) return $('#gName').focus(); addGuest(n).then(function(){ $('#gName').value = ''; $('#gPhone').value = ''; toast('Đã thêm ' + n.trim()); }).catch(function(){toast('Chưa lưu được khách mời, vui lòng thử lại');}); });
+  $('#gAdd').addEventListener('click', function(){ var n = $('#gName').value; if (!n.trim()) return $('#gName').focus(); addGuest(n).then(function(){ $('#gName').value = ''; toast('Đã thêm ' + n.trim()); }).catch(function(){toast('Chưa lưu được khách mời, vui lòng thử lại');}); });
   $('#gName').addEventListener('keydown', function(e){ if (e.key === 'Enter') $('#gAdd').click(); });
   $('#gBulkAdd').addEventListener('click', function(){ var lines = $('#gBulk').value.split('\n').filter(function(s){ return s.trim(); }); Promise.all(lines.map(addGuest)).then(function(){ $('#gBulk').value = ''; toast('Đã thêm ' + lines.length + ' khách'); }); });
   $('#q').addEventListener('input', draw);
 
   function draw(){
-    var groups = ['Tất cả'].concat(Array.from(new Set(G.map(function(g){ return g.group; }))));
-    $('#tabs').innerHTML = groups.map(function(t){ return '<button type="button" class="' + (t === filter ? 'on' : '') + '">' + esc(t) + '</button>'; }).join('');
     var q = $('#q').value.trim().toLowerCase();
     var list = G.filter(function(g){
-      if (filter !== 'Tất cả' && g.group !== filter) return false;
-      return !q || (g.name + ' ' + (g.phone || '')).toLowerCase().indexOf(q) >= 0;
+      return !q || (g.name || '').toLowerCase().indexOf(q) >= 0;
     }).sort(function(a, b){ return (b.ts || 0) - (a.ts || 0); });
     $('#gl').innerHTML = list.length ? list.map(function(g){
       return '<div class="gi" data-id="' + esc(g.id) + '"><div class="nm">' + esc(g.name) + '</div>' +
-        '<div class="ac"><button type="button" data-a="copy">Copy link</button><button type="button" data-a="open">Xem</button><button type="button" class="del" data-a="del">Xoá</button></div>' +
-        '<div class="mt">' + esc(g.group) + (g.phone ? ' · ' + esc(g.phone) : '') + '</div></div>';
+        '<div class="ac"><button type="button" data-a="copy">Copy link</button><button type="button" data-a="open">Xem</button><button type="button" class="del" data-a="del">Xoá</button></div></div>';
     }).join('') : '<div class="wn-empty">Chưa có khách nào. Thêm khách ở trên để tạo link mời riêng.</div>';
   }
-  $('#tabs').addEventListener('click', function(e){ var b = e.target.closest('button'); if (!b) return; filter = b.textContent; draw(); });
   function copy(t){ if (navigator.clipboard) return navigator.clipboard.writeText(t); var a = document.createElement('textarea'); a.value = t; document.body.appendChild(a); a.select(); document.execCommand('copy'); a.remove(); return Promise.resolve(); }
   adm.addEventListener('click', function(e){
     var b = e.target.closest('button[data-a]'); if (!b) return;
@@ -744,8 +731,8 @@ img{display:block;max-width:100%}
     if (a === 'del' && confirm('Xoá khách ' + g.name + '?')) del(COL_G, g.id);
   });
   $('#csv').addEventListener('click', function(){
-    var rows = [['Tên', 'Nhóm', 'SĐT', 'Link mời']];
-    G.forEach(function(g){ rows.push([g.name, g.group, g.phone || '', link(g)]); });
+    var rows = [['Tên', 'Link mời']];
+    G.forEach(function(g){ rows.push([g.name, link(g)]); });
     var csv = '﻿' + rows.map(function(r){ return r.map(function(c){ return '"' + String(c).replace(/"/g, '""') + '"'; }).join(','); }).join('\n');
     var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], {type: 'text/csv'})); a.download = 'khach-moi-trinh-hoang.csv'; a.click();
   });
