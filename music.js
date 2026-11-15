@@ -3,9 +3,9 @@
   if (document.getElementById('weddingMusic')) return;
   var audio = document.createElement('audio');
   audio.id = 'weddingMusic';
-  audio.src = 'https://video.khunglongcon.com/the-gioi-cua-anh.mp3';
+  var musicUrl = 'https://video.khunglongcon.com/the-gioi-cua-anh.mp3';
   audio.loop = true;
-  audio.preload = 'metadata';
+  audio.preload = 'none';
   audio.volume = 0.6;
   audio.setAttribute('playsinline', '');
   audio.setAttribute('aria-hidden', 'true');
@@ -35,6 +35,7 @@
   function play() {
     wanted = true;
     if (pending) return;
+    if (!audio.getAttribute('src')) audio.src = musicUrl;
     if (audio.error) audio.load();
     var result;
     try { result = audio.play(); } catch (error) { render(); return; }
