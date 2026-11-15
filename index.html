@@ -188,7 +188,13 @@ img{display:block;max-width:100%}
 .wplace h3{font-family:var(--disp);font-weight:700;font-size:clamp(19px,5.6vw,24px);letter-spacing:.05em;color:var(--deep)}
 .wp-name{font-family:var(--script);font-size:36px;color:var(--red);margin-top:4px;line-height:1.2}
 .wp-addr{font-size:14.5px;color:var(--ink);margin:6px auto 16px;max-width:320px;line-height:1.6}
-.wp-map{display:block;width:100%;height:280px;margin:20px auto 0;border:1px solid var(--line);border-radius:16px;background:var(--cream);box-shadow:0 10px 28px rgba(60,90,115,.10)}
+.wp-map-toggle{margin:16px auto 0;text-align:center}
+.wp-map-toggle summary{display:inline-flex;align-items:center;gap:8px;padding:8px 4px;list-style:none;cursor:pointer;font-family:var(--disp);font-size:14px;color:var(--soft);text-decoration:underline;text-underline-offset:5px}
+.wp-map-toggle summary::-webkit-details-marker{display:none}
+.wp-map-toggle summary::after{content:"";width:6px;height:6px;border-right:1px solid currentColor;border-bottom:1px solid currentColor;transform:rotate(45deg);margin:0 2px 4px;transition:transform .2s}
+.wp-map-toggle[open] summary::after{transform:rotate(225deg);margin-bottom:0}
+.wp-map-toggle summary:focus-visible{outline:2px solid var(--deep);outline-offset:4px;border-radius:4px}
+.wp-map{display:block;width:100%;height:260px;margin:12px auto 0;border:1px solid var(--line);border-radius:12px;background:var(--cream)}
 /* ===== RSVP ===== */
 .form{background:#fff;border-radius:18px;padding:20px 16px;box-shadow:0 10px 28px rgba(60,90,115,.10);border:1px solid #dfe8ef}
 .fld{display:block;margin-bottom:14px}
@@ -392,7 +398,10 @@ img{display:block;max-width:100%}
       <div class="wp-name">Tư gia nhà gái</div>
       <div class="wp-addr">Đường ra bãi tắm khu tái định cư, Tổ 4, thôn Duy Hà, xã Thăng An, TP. Đà Nẵng</div>
       <a class="btn" target="_blank" rel="noopener" href="https://maps.app.goo.gl/6u9HsJ9EXNzEqr126"><svg viewBox="0 0 24 24"><use href="#pin"/></svg>Chỉ đường</a>
-      <iframe class="wp-map" title="Bản đồ tư gia nhà gái" src="https://www.google.com/maps?q=15.8150106,108.4057229&amp;z=17&amp;output=embed" width="600" height="280" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
+      <details class="wp-map-toggle">
+        <summary>Xem bản đồ</summary>
+        <iframe class="wp-map" title="Bản đồ tư gia nhà gái" src="https://www.google.com/maps?q=15.8150106,108.4057229&amp;z=17&amp;output=embed" width="600" height="260" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
+      </details>
     </div>
 
     <div class="rings rv">
