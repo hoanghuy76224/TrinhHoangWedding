@@ -283,6 +283,7 @@ img{display:block;max-width:100%}
 @media (max-width:520px){.stats{gap:5px}.stats div{padding:8px 2px}.stats b{font-size:21px}.stats small{font-size:10px;line-height:1.2;display:block}.gi{grid-template-columns:1fr}.gi .ac{grid-row:auto;grid-column:1}}
 @media (prefers-reduced-motion:reduce){.rv{opacity:1;transform:none;transition:none}.go,.opcard,.opcard::after{animation:none}.opcard{opacity:1;transform:none}}
 
+[hidden]{display:none!important}
 .guestbook-hint{font-size:14px;text-align:center;color:var(--soft);margin:0 0 20px;line-height:1.7}
 .wish-field{display:none!important}
 .wish-list p{white-space:pre-wrap;overflow-wrap:anywhere}
@@ -466,6 +467,7 @@ img{display:block;max-width:100%}
       <div><h1>Khách mời · Trinh &amp; Hoàng</h1><small id="admMode"></small></div>
       <button class="x" id="admClose" type="button">Xem thiệp</button>
     </div>
+    <div class="box"><p id="adminAuthState" role="status">Đăng nhập Google để đồng bộ khách mời và quản lý lời chúc.</p><button class="b" id="adminGoogle" type="button" style="margin-top:10px">Đăng nhập Google quản trị</button><button class="b gh" id="adminLogout" type="button" hidden style="margin-top:10px">Đăng xuất</button></div>
     <div class="box"><h2>Chọn thiệp để tạo link mời</h2><label for="adminSide">Nhà tổ chức</label><select id="adminSide"><option value="bride">Nhà gái · 28/11/2026</option><option value="groom">Nhà trai · 27/12/2026</option></select></div>
     <div class="stats" id="stats"></div>
     <div class="box">
@@ -514,11 +516,11 @@ img{display:block;max-width:100%}
   function toast(t){ var e = $('#toast'); e.textContent = t; e.classList.add('on'); clearTimeout(e._t); e._t = setTimeout(function(){ e.classList.remove('on'); }, 2200); }
 
   /* ---------- store: Firestore, fallback localStorage ---------- */
-  var db = null, api = null, ready, LS = 'th_demo_';
+  var db = null, api = null, auth = null, authApi = null, ready, LS = 'th_demo_';
   function lsGet(k){ try { return JSON.parse(localStorage.getItem(LS + k) || '[]'); } catch(e){ return []; } }
   function lsSet(k, v){ try { localStorage.setItem(LS + k, JSON.stringify(v)); } catch(e){} }
-  ready = Promise.all([import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js'), import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js')])
-    .then(function(m){ var app = m[0].initializeApp(FIREBASE_CONFIG); api = m[1]; db = api.getFirestore(app); return true; })
+  ready = Promise.all([import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js'), import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js'), import('https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js')])
+    .then(function(m){ var app = m[0].initializeApp(FIREBASE_CONFIG); api = m[1]; db = api.getFirestore(app); authApi=m[2]; auth=authApi.getAuth(app); authApi.onAuthStateChanged(auth,function(user){ updateAdminAuth(user); }); return true; })
     .catch(function(){ return false; });
   var listeners = {};
   function watch(col, cb){
@@ -526,7 +528,7 @@ img{display:block;max-width:100%}
     ready.then(function(ok){
       if (ok && db){
         api.onSnapshot(api.collection(db, col), function(s){ cb(s.docs.map(function(d){ var x = d.data(); x.id = d.id; if (x.createdAt && x.createdAt.toMillis) x.ts = x.createdAt.toMillis(); return x; })); },
-          function(){ db = null; Object.keys(listeners).forEach(localEmit); var m = document.getElementById('admMode'); if (m) m.textContent = 'Chế độ demo · dữ liệu lưu trên máy này'; });
+          function(){ var m = document.getElementById('admMode'); if (m) m.textContent = 'Chưa có quyền đồng bộ. Vui lòng đăng nhập quản trị.'; });
       } else cb(lsGet(col));
     });
   }
@@ -539,6 +541,7 @@ img{display:block;max-width:100%}
   /* put = ghi cả doc (tạo mới / ghi đè), patch = chỉ sửa vài field */
   function put(col, id, data){
     return ready.then(function(ok){
+      if (/^guests_trinhhoang/.test(col) && !isSiteAdmin()) throw new Error('admin-required');
       if (ok && db){ var d = Object.assign({}, data, {createdAt: api.serverTimestamp()}); return api.setDoc(api.doc(db, col, id), d); }
       data.ts = Date.now(); lsMerge(col, id, data);
     });
@@ -574,7 +577,7 @@ img{display:block;max-width:100%}
     $('#invGuest').textContent = GUEST.name;
   }
   applyGuest();
-  if (GID) getOne(COL_G, GID).then(function(g){ if (g){ GUEST.name = g.name || GUEST.name; GUEST.group = g.group || ''; GUEST.num = g.num; applyGuest(); patch(COL_G, GID, {opened: true}).catch(function(){}); } });
+  if (GID) getOne(COL_G, GID).then(function(g){ if (g){ GUEST.name = g.name || GUEST.name; GUEST.group = g.group || ''; GUEST.num = g.num; applyGuest(); } patch(COL_G, GID, {opened: true}).catch(function(){}); });
 
   /* ---------- opening ---------- */
   var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -653,6 +656,15 @@ img{display:block;max-width:100%}
     var csv='\uFEFF'+rows.map(function(row){return row.map(function(v){v=String(v == null ? '' : v);if (/^[=+@-]/.test(v)) v="'"+v;return '"'+v.replace(/"/g,'""')+'"';}).join(',');}).join('\n');
     var a=document.createElement('a'), url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.href=url;a.download='loi-chuc-trinh-hoang.csv';a.click();setTimeout(function(){URL.revokeObjectURL(url);},1000);
   });
+  function isSiteAdmin(){return !!(auth && auth.currentUser && ['hoang615@gmail.com','ntd031096@gmail.com'].indexOf(auth.currentUser.email)>=0);}
+  function updateAdminAuth(user){
+    if (!$('#adminAuthState')) return;
+    var ok=isSiteAdmin();$('#adminAuthState').textContent=ok ? 'Đã đăng nhập: '+user.email : (user ? 'Tài khoản này chưa có quyền quản trị thiệp.' : 'Đăng nhập Google để đồng bộ khách mời và quản lý lời chúc.');
+    $('#adminGoogle').hidden=ok;$('#adminLogout').hidden=!user;
+    if (ok && typeof started!=='undefined' && started){selectAdminSide();$('#admMode').textContent='Đang đồng bộ online · cập nhật trực tiếp';}
+  }
+  $('#adminGoogle').addEventListener('click',function(){ready.then(function(ok){if(!ok || !auth)throw new Error('offline');return authApi.signInWithPopup(auth,new authApi.GoogleAuthProvider());}).catch(function(e){$('#adminAuthState').textContent=e.code==='auth/unauthorized-domain' ? 'Tên miền thiệp chưa được cấp quyền đăng nhập Firebase.' : 'Chưa đăng nhập được. Vui lòng thử lại.';});});
+  $('#adminLogout').addEventListener('click',function(){if(auth)authApi.signOut(auth).then(function(){location.reload();});});
   var adminWatched = {};
   function selectAdminSide(){
     var groom=$('#adminSide').value==='groom';
@@ -661,8 +673,9 @@ img{display:block;max-width:100%}
     G=[];R=[];filter='Tất cả';$('#q').value='';$('#createdLink').hidden=true;
     $('#gGroup').value=groom ? 'Nhà trai' : 'Nhà gái';$('#adminWishes').hidden=groom;
     draw();
+    if (!isSiteAdmin()) return;
     [COL_G,COL_R].forEach(function(col){
-      if (adminWatched[col]){ if (col===COL_G) G=adminWatched[col]; else R=adminWatched[col]; draw(); return; }
+      if (Object.prototype.hasOwnProperty.call(adminWatched,col)){ if (col===COL_G) G=adminWatched[col]; else R=adminWatched[col]; draw(); return; }
       adminWatched[col]=[];
       watch(col,function(l){adminWatched[col]=l;if(col===COL_G){G=l;draw();}else if(col===COL_R){R=l;draw();}});
     });
@@ -693,7 +706,8 @@ img{display:block;max-width:100%}
   function unlock(){
     $('#admLock').hidden = true; $('#admIn').hidden = false;
     if (started) return; started = true;
-    ready.then(function(ok){ $('#admMode').textContent = ok && db ? 'Đang đồng bộ online · cập nhật trực tiếp' : 'Chế độ demo · dữ liệu lưu trên máy này'; });
+    updateAdminAuth(auth && auth.currentUser);
+    ready.then(function(ok){ $('#admMode').textContent = ok && db ? (isSiteAdmin() ? 'Đang đồng bộ online · cập nhật trực tiếp' : 'Tạo link nhanh được ngay · đăng nhập để lưu danh sách') : 'Chưa kết nối được máy chủ'; });
     selectAdminSide();
   }
   function link(g){ return SITE + '?g=' + g.id + '&n=' + encodeURIComponent(g.name); }
